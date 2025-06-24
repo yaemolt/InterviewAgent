@@ -4,13 +4,21 @@ import requests
 import json
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
-# DeepSeek API配置
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_API_KEY = "sk-96ad5c5974ef42b79f7502e1380d0fa8"  # DeepSeek API密钥
+# DeepSeek API配置 - 优先使用环境变量
+DEEPSEEK_API_URL = os.getenv("DEEPSEEK_API_URL", "https://api.deepseek.com/v1/chat/completions")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-96ad5c5974ef42b79f7502e1380d0fa8")
+
+# 检查API密钥是否配置
+if not DEEPSEEK_API_KEY or DEEPSEEK_API_KEY == "your_deepseek_api_key_here":
+    print("⚠️  警告：未正确配置DeepSeek API密钥！")
 
 class ChatService:
     def __init__(self):
@@ -200,9 +208,16 @@ def get_available_models():
     })
 
 if __name__ == '__main__':
+    # 从环境变量获取配置
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.getenv("FLASK_PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "True").lower() == "true"
+    
     print("🚀 DeepSeek Chat API 服务启动中...")
-    print(f"📡 服务地址: http://localhost:5000")
-    print(f"🔑 API密钥已配置")
+    print(f"📡 服务地址: http://localhost:{port}")
+    print(f"🔑 API密钥状态: {'✅ 已配置' if DEEPSEEK_API_KEY and len(DEEPSEEK_API_KEY) > 10 else '❌ 未配置'}")
+    print(f"🌐 允许跨域: ✅")
+    print(f"🔧 调试模式: {'✅' if debug else '❌'}")
     print("✅ 服务准备就绪，可以开始对话了！")
     
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    app.run(debug=debug, host=host, port=port) 

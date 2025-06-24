@@ -2,8 +2,8 @@ import axios from 'axios'
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8080/api',
-  timeout: 10000,
+  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api',
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -48,20 +48,25 @@ export const sendMessage = async (message) => {
     })
     return response
   } catch (error) {
-    // 模拟响应（用于开发测试）
-    if (error.code === 'ERR_NETWORK') {
-      console.warn('网络连接失败，使用模拟响应')
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            data: {
-              message: `您刚才说："${message}"。这是一个模拟回复，请配置后端API接口。`,
-              timestamp: Date.now()
-            }
-          })
-        }, 1000)
-      })
+    console.error('发送消息失败：', error)
+    
+    // 网络连接错误时的处理
+    if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+      throw new Error('无法连接到服务器，请检查后端服务是否已启动（端口5000）')
     }
+    
+    // 超时错误
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('请求超时，请稍后重试')
+    }
+    
+    // 服务器错误
+    if (error.response) {
+      const status = error.response.status
+      const errorMsg = error.response.data?.error || '服务器响应错误'
+      throw new Error(`服务器错误 (${status}): ${errorMsg}`)
+    }
+    
     throw error
   }
 }
