@@ -17,7 +17,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        rewrite: (path) => path // 保持/api路径不变
       }
     }
   }

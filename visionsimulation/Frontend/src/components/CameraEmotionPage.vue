@@ -77,6 +77,14 @@
         >
           查看完整结果
         </button>
+
+        <button
+          @click="testVideoAPI"
+          class="camera-emotion-page__button camera-emotion-page__button--test"
+          :disabled="loading"
+        >
+          测试API连接
+        </button>
       </div>
 
       <!-- 错误信息显示 -->
@@ -89,7 +97,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { recognizeEmotion } from '@/api/emotion.js'
+import { recognizeEmotion, checkAPIHealth, testAPI } from '@/api/emotion.js'
 
 const emit = defineEmits(['show-result'])
 
@@ -117,11 +125,39 @@ const latestEmotion = computed(() => {
   return emotionResults.value[emotionResults.value.length - 1]
 })
 
+// 检查API健康状态
+const checkBackendHealth = async () => {
+  try {
+    const response = await checkAPIHealth()
+    if (response.data && response.data.status === 'healthy' && response.data.model_loaded) {
+      console.log('✅ 后端API健康检查通过')
+      console.log('模型状态:', response.data.model_loaded ? '已加载' : '未加载')
+      console.log('设备:', response.data.device || 'unknown')
+      return true
+    } else {
+      console.warn('⚠️ 后端API状态异常:', response.data)
+      error.value = '后端模型未加载，请检查后端服务'
+      return false
+    }
+  } catch (err) {
+    console.error('❌ 后端健康检查失败:', err)
+    error.value = '无法连接到后端服务，请确保后端运行在 localhost:5000'
+    return false
+  }
+}
+
 // 初始化摄像头
 const initCamera = async () => {
   try {
     loading.value = true
     error.value = ''
+    
+    // 首先检查后端API状态
+    const backendReady = await checkBackendHealth()
+    if (!backendReady) {
+      loading.value = false
+      return
+    }
     
     const constraints = {
       video: {
@@ -161,16 +197,46 @@ const startRecording = async () => {
     isRecording.value = true
     error.value = ''
 
-    // 配置MediaRecorder以确保每次收到正好8帧（1秒@8fps）
-    const options = {
-      mimeType: 'video/webm;codecs=vp8'
+    // 配置MediaRecorder，使用最稳定的设置
+    let options = {}
+    
+    // 尝试不同的视频格式，优先使用最兼容的
+    const supportedTypes = [
+      'video/mp4',
+      'video/webm;codecs=vp8',
+      'video/webm;codecs=vp9', 
+      'video/webm'
+    ]
+    
+    console.log('🎬 检查支持的视频格式：')
+    for (const type of supportedTypes) {
+      const supported = MediaRecorder.isTypeSupported(type)
+      console.log(`   ${type}: ${supported ? '✅' : '❌'}`)
+      
+      if (supported && !options.mimeType) {
+        options = { 
+          mimeType: type,
+          videoBitsPerSecond: 1000000 // 1Mbps，减少文件大小
+        }
+        console.log(`✅ 选择格式: ${type}`)
+      }
+    }
+    
+    if (!options.mimeType) {
+      console.warn('⚠️ 使用默认视频格式')
+      options = {
+        videoBitsPerSecond: 1000000
+      }
     }
     
     mediaRecorder = new MediaRecorder(mediaStream, options)
     
     mediaRecorder.ondataavailable = async (event) => {
       if (event.data && event.data.size > 0) {
-        console.log('收到视频片段，大小：', event.data.size, 'bytes')
+        console.log('📹 收到视频片段')
+        console.log('   大小：', event.data.size, 'bytes')
+        console.log('   类型：', event.data.type)
+        console.log('   实际格式：', options?.mimeType || 'default')
         await handleVideoData(event.data)
       }
     }
@@ -206,28 +272,117 @@ const handleVideoData = async (videoBlob) => {
     console.log('正在发送视频片段进行情绪识别...')
     const response = await recognizeEmotion(videoBlob)
     
+    // 添加详细的调试日志
+    console.log('🔍 完整API响应：', response)
+    console.log('🔍 响应状态：', response.status)
+    console.log('🔍 响应数据：', response.data)
+    
     if (response.data && response.data.success) {
+      const data = response.data.data
+      
+      // 找到主导情绪和置信度
+      const dominantEmotion = data.dominant_emotion || '未知'
+      const overallEngagement = data.overall_engagement || 0
+      
+      // 处理四个维度的情绪数据
       const emotionData = {
-        emotion: response.data.emotion || '未知',
-        confidence: Math.round((response.data.confidence || 0) * 100),
+        emotion: dominantEmotion,
+        confidence: Math.round(overallEngagement * 100 / 3), // 转换为百分比 (0-3 -> 0-100)
         timestamp: new Date().toISOString(),
+        processingTime: data.processing_time || '0ms',
+        allEmotions: data.emotions || [],
+        overallEngagement: data.overall_engagement || 0,
+        overallConfusion: data.overall_confusion || 0,
         rawData: response.data
       }
       
       emotionResults.value.push(emotionData)
-      console.log('情绪识别成功：', emotionData)
+      console.log('✅ 情绪识别成功，当前识别次数：', emotionResults.value.length)
+      console.log('🎯 识别结果：', emotionData)
+      console.log('📊 详细情绪数据：', data.emotions)
     } else {
-      console.warn('情绪识别返回异常数据：', response.data)
+      console.warn('⚠️ 情绪识别返回异常数据：', response.data)
+      
+      // 即使格式不对，也尝试处理数据（容错处理）
+      if (response.data) {
+        const fallbackData = {
+          emotion: '未知',
+          confidence: 0,
+          timestamp: new Date().toISOString(),
+          processingTime: '0ms',
+          allEmotions: [],
+          overallEngagement: 0,
+          overallConfusion: 0,
+          rawData: response.data
+        }
+        emotionResults.value.push(fallbackData)
+        console.log('📝 使用容错数据，当前识别次数：', emotionResults.value.length)
+      }
     }
   } catch (err) {
-    console.error('情绪识别失败：', err)
-    // 不中断录制，继续处理下一个片段
+    console.error('❌ 情绪识别失败：', err)
+    
+    // 添加一个错误记录
+    const errorData = {
+      emotion: '错误',
+      confidence: 0,
+      timestamp: new Date().toISOString(),
+      processingTime: '0ms',
+      allEmotions: [],
+      overallEngagement: 0,
+      overallConfusion: 0,
+      error: err.message,
+      rawData: null
+    }
+    emotionResults.value.push(errorData)
+    console.log('🚨 添加错误记录，当前识别次数：', emotionResults.value.length)
   }
 }
 
 // 查看完整结果
 const viewResults = () => {
   emit('show-result', emotionResults.value)
+}
+
+// 测试视频API连接
+const testVideoAPI = async () => {
+  try {
+    loading.value = true
+    error.value = ''
+    
+    console.log('🧪 开始测试API连接...')
+    
+    // 先测试健康检查
+    const healthResponse = await checkAPIHealth()
+    console.log('🏥 健康检查结果：', healthResponse.data)
+    
+    // 再测试虚拟数据API
+    const testResponse = await testAPI()
+    console.log('🧪 测试API结果：', testResponse.data)
+    
+    // 如果成功，添加一个测试结果
+    if (testResponse.data && testResponse.data.success) {
+      const testData = {
+        emotion: '测试成功',
+        confidence: 100,
+        timestamp: new Date().toISOString(),
+        processingTime: testResponse.data.data?.processing_time || '0ms',
+        allEmotions: testResponse.data.data?.emotions || [],
+        overallEngagement: testResponse.data.data?.overall_engagement || 0,
+        overallConfusion: testResponse.data.data?.overall_confusion || 0,
+        rawData: testResponse.data
+      }
+      
+      emotionResults.value.push(testData)
+      console.log('✅ API测试成功，当前识别次数：', emotionResults.value.length)
+    }
+    
+  } catch (err) {
+    console.error('❌ API测试失败：', err)
+    error.value = `API测试失败: ${err.message}`
+  } finally {
+    loading.value = false
+  }
 }
 
 // 清理资源
