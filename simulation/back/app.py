@@ -208,16 +208,15 @@ def get_available_models():
     })
 
 if __name__ == '__main__':
-    # 从环境变量获取配置
-    host = os.getenv("FLASK_HOST", "0.0.0.0")
-    port = int(os.getenv("FLASK_PORT", "5000"))
-    debug = os.getenv("FLASK_DEBUG", "True").lower() == "true"
+    print("🚀 启动DeepSeek聊天API服务...")
+    print(f"📡 API URL: {DEEPSEEK_API_URL}")
+    print(f"🔑 API Key配置: {'✓ 已配置' if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != 'your_deepseek_api_key_here' else '✗ 未配置'}")
+    print("🌐 服务器地址: http://localhost:5000")
+    print("📋 健康检查: http://localhost:5000/api/health")
+    print("-" * 50)
     
-    print("🚀 DeepSeek Chat API 服务启动中...")
-    print(f"📡 服务地址: http://localhost:{port}")
-    print(f"🔑 API密钥状态: {'✅ 已配置' if DEEPSEEK_API_KEY and len(DEEPSEEK_API_KEY) > 10 else '❌ 未配置'}")
-    print(f"🌐 允许跨域: ✅")
-    print(f"🔧 调试模式: {'✅' if debug else '❌'}")
-    print("✅ 服务准备就绪，可以开始对话了！")
-    
-    app.run(debug=debug, host=host, port=port) 
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=True
+    ) 

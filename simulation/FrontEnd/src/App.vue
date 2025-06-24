@@ -41,7 +41,7 @@ const handleSendMessage = async (messageText) => {
     // 添加机器人回复
     const botMessage = {
       id: Date.now() + 1,
-      text: response.data.message || '抱歉，我暂时无法回答您的问题。',
+      text: response.data.response || '抱歉，我暂时无法回答您的问题。',
       type: 'bot',
       timestamp: Date.now()
     }
