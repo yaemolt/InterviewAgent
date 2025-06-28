@@ -1,26 +1,54 @@
-# DeepSeek 对话 API
+# 智能面试系统后端服务
 
-这是一个与 DeepSeek API 对接的后端服务，提供对话功能的 REST API 接口。
+基于星火大模型的智能面试系统后端服务，提供简历处理和面试对话功能。
 
-## 功能特性
+## 🚀 功能特性
 
-- ✅ 与 DeepSeek API 完整对接
-- ✅ 支持对话历史管理
+- 📝 简历信息处理和存储
+- 🤖 基于星火大模型的智能面试对话  
+- 💡 个性化面试问题生成
+- 📊 面试对话历史管理
 - ✅ 跨域请求支持 (CORS)
 - ✅ 错误处理和重试机制
-- ✅ 多模型支持
 - ✅ RESTful API 设计
 
-## API 接口
+## 🔧 环境配置
 
-### 1. 对话接口
+### 星火大模型API配置
+
+1. 访问 [讯飞开放平台](https://console.xfyun.cn/) 注册账号
+2. 创建应用并获取以下信息：
+   - API Key
+   - App ID  
+   - API Secret
+
+3. 设置环境变量（推荐创建 `.env` 文件）：
+
+```bash
+# 星火大模型API配置
+SPARK_API_KEY=your_spark_api_key_here
+SPARK_APP_ID=your_app_id_here  
+SPARK_API_SECRET=your_api_secret_here
+SPARK_API_URL=https://spark-api-open.xf-yun.com/v1/chat/completions
 ```
-POST /api/chat
+
+## 📚 API接口
+
+### 1. 简历提交接口
+```
+POST /api/interview/start
 Content-Type: application/json
 
 {
-    "message": "你好，请介绍一下自己",
-    "model": "deepseek-chat"  // 可选，默认为 deepseek-chat
+    "resume": {
+        "name": "张三",
+        "targetPosition": "前端开发工程师",
+        "education": "本科",
+        "major": "计算机科学与技术",
+        "workExperience": "1-3年",
+        "technicalSkills": "JavaScript, Vue.js, React",
+        // ...其他简历字段
+    }
 }
 ```
 
@@ -28,36 +56,79 @@ Content-Type: application/json
 ```json
 {
     "success": true,
-    "response": "你好！我是DeepSeek，一个AI助手...",
-    "model": "deepseek-chat",
+    "firstQuestion": "您好张三！很高兴见到您...",
+    "message": "简历提交成功，面试已开始",
+    "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+### 2. 面试对话接口
+```
+POST /api/chat
+Content-Type: application/json
+
+{
+    "message": "我毕业于某某大学计算机专业...",
+    "model": "generalv3.5"  // 可选，默认为 generalv3.5
+}
+```
+
+响应：
+```json
+{
+    "success": true,
+    "response": "很好！您的教育背景很扎实...",
+    "model": "generalv3.5",
     "usage": {
-        "prompt_tokens": 10,
-        "completion_tokens": 20,
-        "total_tokens": 30
+        "prompt_tokens": 150,
+        "completion_tokens": 80,
+        "total_tokens": 230
     },
     "timestamp": "2024-01-01T12:00:00.000Z"
 }
 ```
 
-### 2. 获取对话历史
+### 3. 获取对话历史
 ```
 GET /api/chat/history?limit=50
 ```
 
-### 3. 清空对话历史
+### 4. 清空对话历史
 ```
 POST /api/chat/clear
 ```
 
-### 4. 获取可用模型
+### 5. 获取可用模型
 ```
 GET /api/models
 ```
 
-### 5. 健康检查
+响应：
+```json
+{
+    "success": true,
+    "models": [
+        {
+            "id": "generalv3.5",
+            "name": "星火大模型 3.5",
+            "description": "星火大模型通用版本，适合面试对话"
+        }
+    ]
+}
+```
+
+### 6. 健康检查
 ```
 GET /api/health
 ```
+
+## 🎯 面试流程
+
+1. **简历提交**: 用户填写简历表格并提交到 `/api/interview/start`
+2. **AI分析**: 系统解析简历信息，生成个性化面试官提示词
+3. **问题生成**: 基于简历背景生成第一个面试问题
+4. **对话交互**: 用户通过 `/api/chat` 与面试官进行对话
+5. **智能追问**: AI根据回答进行有针对性的追问和深入
 
 ## 快速开始
 
@@ -68,11 +139,13 @@ pip install -r requirements.txt
 
 ### 2. 配置环境变量
 ```bash
-# 复制环境变量模板
-cp .env.example .env
-
-# 编辑 .env 文件，填入你的 DeepSeek API 密钥
-# DEEPSEEK_API_KEY=your_actual_api_key
+# 创建 .env 文件，填入你的星火大模型API信息
+cat > .env << EOF
+SPARK_API_KEY=your_spark_api_key_here
+SPARK_APP_ID=your_app_id_here  
+SPARK_API_SECRET=your_api_secret_here
+SPARK_API_URL=https://spark-api-open.xf-yun.com/v1/chat/completions
+EOF
 ```
 
 ### 3. 运行服务
@@ -96,7 +169,7 @@ async function sendMessage(message) {
             },
             body: JSON.stringify({
                 message: message,
-                model: 'deepseek-chat'
+                model: 'generalv3.5'
             })
         });
         
@@ -141,7 +214,7 @@ function ChatComponent() {
                 },
                 body: JSON.stringify({
                     message: message,
-                    model: 'deepseek-chat'
+                    model: 'generalv3.5'
                 })
             });
             
@@ -169,20 +242,31 @@ function ChatComponent() {
 }
 ```
 
-## 环境变量说明
+## 📝 环境变量说明
 
-- `DEEPSEEK_API_KEY`: DeepSeek API 密钥（必填）
+- `SPARK_API_KEY`: 星火大模型 API 密钥（必填）
+- `SPARK_APP_ID`: 星火大模型应用 ID（必填）
+- `SPARK_API_SECRET`: 星火大模型 API 密钥（必填）
+- `SPARK_API_URL`: 星火大模型 API 地址
 - `FLASK_ENV`: Flask 环境（development/production）
 - `FLASK_DEBUG`: 是否开启调试模式
-- `HOST`: 服务器绑定地址
-- `PORT`: 服务器端口
 
-## 注意事项
+## ⚠️ 注意事项
 
-1. 请确保您有有效的 DeepSeek API 密钥
+1. 请确保您有有效的星火大模型 API 密钥
 2. 生产环境请关闭调试模式
 3. 建议使用 HTTPS 以保护 API 密钥安全
-4. 可以根据需要调整对话历史的保存数量以控制内存使用
+4. 简历信息将存储在内存中，重启服务会丢失
+5. 可以根据需要调整对话历史的保存数量以控制内存使用
+
+## 🎯 提示词设计
+
+系统会根据简历信息自动生成个性化的面试官提示词，包含：
+
+- 求职者的基本信息和背景
+- 针对性的面试策略和重点
+- 专业友好的面试风格指导
+- 循序渐进的问题设计原则
 
 ## 错误码说明
 
