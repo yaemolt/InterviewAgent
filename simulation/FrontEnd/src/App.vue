@@ -16,8 +16,8 @@
           📝 填写简历
         </button>
       </div>
-      <ChatList :messages="messages" />
-      <ChatInput @send="handleSendMessage" :loading="loading" />
+      <ChatList :messages="messages" :tts-available="ttsAvailable" />
+      <ChatInput @send="handleSendMessage" :loading="loading" :asr-available="asrAvailable" />
     </div>
   </div>
 </template>
@@ -32,6 +32,8 @@ import { sendMessage, submitResume } from '@/api/chat.js'
 // 页面状态管理
 const currentPage = ref('resume') // 默认显示简历页面
 const resumeLoading = ref(false)
+const ttsAvailable = ref(false) // TTS服务可用性
+const asrAvailable = ref(false) // ASR服务可用性
 
 const messages = ref([
   {
@@ -49,6 +51,10 @@ const handleResumeSubmit = async (resumeData) => {
   resumeLoading.value = true
   try {
     const response = await submitResume(resumeData)
+    
+    // 更新TTS和ASR可用性状态
+    ttsAvailable.value = response.data.tts_available || false
+    asrAvailable.value = response.data.asr_available || false
     
     // 切换到聊天页面
     currentPage.value = 'chat'
@@ -90,6 +96,10 @@ const handleSendMessage = async (messageText) => {
   loading.value = true
   try {
     const response = await sendMessage(messageText)
+    
+    // 更新TTS和ASR可用性状态
+    ttsAvailable.value = response.data.tts_available || false
+    asrAvailable.value = response.data.asr_available || false
     
     // 添加机器人回复
     const botMessage = {
